@@ -1,0 +1,6 @@
+services:
+  app:
+    container_name: syssoft-integra-rabbit-consumer
+    build:
+      context: .
+      dockerfile: Dockerfile

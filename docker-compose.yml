@@ -1,0 +1,11 @@
+services:
+  rabbitmq-consumer:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/syssoftintegra/rabbitmq-consumer:latest
+    container_name: sysintegra-rabbitmq-consumer
+    restart: always
+    networks:
+      - luis
+
+networks:
+  luis:
+    external: true

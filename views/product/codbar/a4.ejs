@@ -1,0 +1,77 @@
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="<%= style %>" />
+    <title><%= title %></title>
+    <style>
+      :root {
+        --page-width: 210mm;
+        --page-height: 297mm;
+        --content-padding: 20mm;
+      }
+
+      .page {
+        width: var(--page-width);
+        height: var(--page-height);
+        overflow: hidden;
+        page-break-after: always;
+        position: relative;
+        background: white;
+      }
+
+      .container{
+        padding: 7mm; 
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 7mm;
+      }
+
+      .bar-code {
+        width: 60mm; /* 9 cm de ancho por etiqueta */
+        height: 30mm; /* 6 cm de alto por etiqueta */
+        border: 1px solid #000;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+      }
+
+      .product-name {
+        font-size: 1rem;
+        font-weight: bold;
+      }
+
+      .price {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #333;
+      }
+
+      .image{
+        background-color: white;
+      }
+
+      .image img {
+        max-width: 100%;
+        height: auto;
+      }
+    </style>
+  </head>
+  <body>
+      <div class="page">
+        <div class="container">
+            <% for (let i = 0; i < 8; i++) { %>
+              <div class="bar-code">
+                <div class="product-name">Producto 1</div>
+                <div class="image">
+                  <img src="data:image/png;base64,<%= base64QR %>" alt="Código de Barras" width="150" />
+                </div>
+                <div class="price">$15.00</div>
+              </div>
+            <% } %>
+        </div>
+      </div>
+  </body>
+</html>
