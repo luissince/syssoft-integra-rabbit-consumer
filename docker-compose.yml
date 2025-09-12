@@ -10,5 +10,8 @@ services:
       - luis
 
 networks:
-  luis:
+  default:
     external: true
+    name: luis
+network_mode: host
+
