@@ -16,7 +16,7 @@ export async function getBrowser(): Promise<Browser> {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--single-process',
+        // '--single-process',
       ],
     });
     console.log('✅ Navegador iniciado');
@@ -44,14 +44,27 @@ export async function newContext(): Promise<BrowserContext> {
 export async function withNewPage<T>(
   fn: (page: Page, context: BrowserContext) => Promise<T>,
 ): Promise<T> {
-  const context = await newContext();
-  const page = await context.newPage();
+  let context: BrowserContext | null = null;
+  let page: Page | null = null;
+
   try {
+    context = await newContext();
+    page = await context.newPage();
     return await fn(page, context);
+  } catch (err) {
+    console.error('❌ Error en withNewPage:', err);
+    throw err;
   } finally {
-    await context.close(); // se limpia después del uso
+    if (context) {
+      try {
+        await context.close();
+      } catch (err) {
+        console.warn('⚠️ Error cerrando contexto:', err);
+      }
+    }
   }
 }
+
 
 /**
  * Cierra el navegador (llamar al cerrar el servidor)
