@@ -1,9 +1,6 @@
 services:
   rabbitmq-consumer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: sysintegra-rabbitmq-consumer-image
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/syssoftintegra/rabbitmq-consumer:latest
     container_name: sysintegra-rabbitmq-consumer
     restart: always
     networks:
