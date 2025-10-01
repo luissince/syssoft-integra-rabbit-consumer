@@ -1,0 +1,109 @@
+name: Docker Image CI - SysSoftIntegra Rabbit Consumer
+
+on:
+  push:
+    branches: 
+      - master
+
+jobs:
+  build-nestjs:
+    name: Construir y subir imagen a ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Crear archivo .env
+        run: |
+          cat > .env <<EOL
+          APP_URL_DOCUMENTS="${{secrets.APP_URL_DOCUMENTS}}"
+          AWS_REGION_S3="${{secrets.AWS_REGION_S3}}"
+          AWS_ACCESS_KEY_ID_S3="${{secrets.AWS_ACCESS_KEY_ID_S3}}"
+          AWS_SECRET_ACCESS_KEY_S3="${{secrets.AWS_SECRET_ACCESS_KEY_S3}}"
+          PDF_BUCKET="${{secrets.PDF_BUCKET}}"
+          RABBITMQ_HOSTS="${{secrets.RABBITMQ_HOSTS}}"
+          EOL
+
+      - name: Construyendo contenedor NestJs
+        run: docker compose -f docker-compose.build.yml build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Iniciar sesión en Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1 
+
+      - name: Agregar etiqueta latest a la imagen
+        run: docker tag syssoft-integra-rabbit-consumer ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/syssoftintegra/rabbit-consumer:latest
+
+      - name: Subir imagen a ECR
+        run: docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/syssoftintegra/rabbit-consumer:latest
+
+  deploy-nestjs:
+    name: Deployar en producción
+    runs-on: self-hosted
+    needs: build-nestjs
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Iniciar sesión en Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Descargar imagen desde ECR
+        run: docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/syssoftintegra/rabbit-consumer:latest
+
+      - name: Crear y ejecutar contenedor en producción
+        run: docker compose -f docker-compose.prod.yml up -d
+      
+      - name: Eliminar imágenes locales
+        run: docker image prune -af || true
+
+  clean-ecr-images:
+    name: Borrar imágenes antiguas de ECR
+    runs-on: ubuntu-latest
+    needs: deploy-nestjs
+    steps:
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Instalar jq
+        run: sudo apt-get install -y jq
+
+      - name: Borrar imágenes sin tag 'latest'
+        run: |
+          REPO="syssoftintegra/rabbit-consumer"
+
+            # 1. Obtener todas las imágenes (excepto latest)
+            aws ecr list-images --repository-name $REPO \
+              --query 'imageIds[?type(imageTag)==`null` || imageTag!=`latest`]' \
+              --output json > images.json
+
+            # 2. Verificar si hay imágenes para borrar
+            if [ $(jq -e 'length > 0' images.json) = "true" ]; then
+              echo "Borrando $(jq length images.json) imágenes antiguas..."
+              aws ecr batch-delete-image --repository-name $REPO --image-ids file://images.json
+            else
+              echo "No hay imágenes antiguas para borrar en $REPO"
+            fi
